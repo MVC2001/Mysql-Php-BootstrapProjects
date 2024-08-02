@@ -1,0 +1,1 @@
+row").each((e=>{const n=s(t,"top");fe(t,"data-initial-top"),d.trigger.adjustHeight(o,n,parseInt(e,10))})),r(t,"data-column").each((e=>{const n=s(t,"left");fe(t,"data-initial-left"),d.trigger.adjustWidth(o,n,p

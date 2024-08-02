@@ -1,0 +1,250 @@
+class to the new first step button
+    if (index === 0)
+    {
+        stepCollection.find("li").removeClass("first").eq(index).addClass("first");
+    }
+
+    // Set the "last" class to the new last step button
+    if (index === (state.stepCount - 1))
+    {
+        stepCollection.find("li").removeClass("last").eq(index).addClass("last");
+    }
+
+    // Register click event
+    stepItem.children("a").bind("click" + getEventNamespace(wizard), stepClickHandler);
+}
+
+/**
+ * Saves the current state to a cookie.
+ *
+ * @static
+ * @private
+ * @method saveCurrentStateToCookie
+ * @param wizard {Object} A jQuery wizard object
+ * @param options {Object} Settings of the current wizard
+ * @param state {Object} The state container of the current wizard
+ */
+function saveCurrentStateToCookie(wizard, options, state)
+{
+    if (options.saveState && $.cookie)
+    {
+        $.cookie(_cookiePrefix + getUniqueId(wizard), state.currentIndex);
+    }
+}
+
+function startTransitionEffect(wizard, options, state, index, oldIndex, doneCallback)
+{
+    var stepContents = wizard.find(".content > .body"),
+        effect = getValidEnumValue(transitionEffect, options.transitionEffect),
+        effectSpeed = options.transitionEffectSpeed,
+        newStep = stepContents.eq(index),
+        currentStep = stepContents.eq(oldIndex);
+
+    switch (effect)
+    {
+        case transitionEffect.fade:
+        case transitionEffect.slide:
+            var hide = (effect === transitionEffect.fade) ? "fadeOut" : "slideUp",
+                show = (effect === transitionEffect.fade) ? "fadeIn" : "slideDown";
+
+            state.transitionElement = newStep;
+            currentStep[hide](effectSpeed, function ()
+            {
+                var wizard = $(this)._showAria(false).parent().parent(),
+                    state = getState(wizard);
+
+                if (state.transitionElement)
+                {
+                    state.transitionElement[show](effectSpeed, function ()
+                    {
+                        $(this)._showAria();
+                    }).promise().done(doneCallback);
+                    state.transitionElement = null;
+                }
+            });
+            break;
+
+        case transitionEffect.slideLeft:
+            var outerWidth = currentStep.outerWidth(true),
+                posFadeOut = (index > oldIndex) ? -(outerWidth) : outerWidth,
+                posFadeIn = (index > oldIndex) ? outerWidth : -(outerWidth);
+
+            $.when(currentStep.animate({ left: posFadeOut }, effectSpeed, 
+                    function () { $(this)._showAria(false); }),
+                newStep.css("left", posFadeIn + "px")._showAria()
+                    .animate({ left: 0 }, effectSpeed)).done(doneCallback);
+            break;
+
+        default:
+            $.when(currentStep._showAria(false), newStep._showAria())
+                .done(doneCallback);
+            break;
+    }
+}
+
+/**
+ * Fires when a step click happens.
+ *
+ * @static
+ * @private
+ * @event click
+ * @param event {Object} An event object
+ */
+function stepClickHandler(event)
+{
+    event.preventDefault();
+
+    var anchor = $(this),
+        wizard = anchor.parent().parent().parent().parent(),
+        options = getOptions(wizard),
+        state = getState(wizard),
+        oldIndex = state.currentIndex;
+
+    if (anchor.parent().is(":not(.disabled):not(.current)"))
+    {
+        var href = anchor.attr("href"),
+            position = parseInt(href.substring(href.lastIndexOf("-") + 1), 0);
+
+        goToStep(wizard, options, state, position);
+    }
+
+    // If nothing has changed
+    if (oldIndex === state.currentIndex)
+    {
+        getStepAnchor(wizard, oldIndex).focus();
+        return false;
+    }
+}
+
+function throwError(message)
+{
+    if (arguments.length > 1)
+    {
+        message = message.format(Array.prototype.slice.call(arguments, 1));
+    }
+
+    throw new Error(message);
+}
+
+/**
+ * Checks an argument for null or undefined and throws an error if one check applies.
+ *
+ * @static
+ * @private
+ * @method validateArgument
+ * @param argumentName {String} The name of the given argument
+ * @param argumentValue {Object} The argument itself
+ */
+function validateArgument(argumentName, argumentValue)
+{
+    if (argumentValue == null)
+    {
+        throwError("The argument '{0}' is null or undefined.", argumentName);
+    }
+}
+
+/**
+ * Represents a jQuery wizard plugin.
+ *
+ * @class steps
+ * @constructor
+ * @param [method={}] The name of the method as `String` or an JSON object for initialization
+ * @param [params=]* {Array} Additional arguments for a method call
+ * @chainable
+ **/
+$.fn.steps = function (method)
+{
+    if ($.fn.steps[method])
+    {
+        return $.fn.steps[method].apply(this, Array.prototype.slice.call(arguments, 1));
+    }
+    else if (typeof method === "object" || !method)
+    {
+        return initialize.apply(this, arguments);
+    }
+    else
+    {
+        $.error("Method " + method + " does not exist on jQuery.steps");
+    }
+};
+
+/**
+ * Adds a new step.
+ *
+ * @method add
+ * @param step {Object} The step object to add
+ * @chainable
+ **/
+$.fn.steps.add = function (step)
+{
+    var state = getState(this);
+    return insertStep(this, getOptions(this), state, state.stepCount, step);
+};
+
+/**
+ * Removes the control functionality completely and transforms the current state to the initial HTML structure.
+ *
+ * @method destroy
+ * @chainable
+ **/
+$.fn.steps.destroy = function ()
+{
+    return destroy(this, getOptions(this));
+};
+
+/**
+ * Triggers the onFinishing and onFinished event.
+ *
+ * @method finish
+ **/
+$.fn.steps.finish = function ()
+{
+    finishStep(this, getState(this));
+};
+
+/**
+ * Gets the current step index.
+ *
+ * @method getCurrentIndex
+ * @return {Integer} The actual step index (zero-based)
+ * @for steps
+ **/
+$.fn.steps.getCurrentIndex = function ()
+{
+    return getState(this).currentIndex;
+};
+
+/**
+ * Gets the current step object.
+ *
+ * @method getCurrentStep
+ * @return {Object} The actual step object
+ **/
+$.fn.steps.getCurrentStep = function ()
+{
+    return getStep(this, getState(this).currentIndex);
+};
+
+/**
+ * Gets a specific step object by index.
+ *
+ * @method getStep
+ * @param index {Integer} An integer that belongs to the position of a step
+ * @return {Object} A specific step object
+ **/
+$.fn.steps.getStep = function (index)
+{
+    return getStep(this, index);
+};
+
+/**
+ * Inserts a new step to a specific position.
+ *
+ * @method insert
+ * @param index {Integer} The position (zero-based) to add
+ * @param step {Object} The step object to add
+ * @example
+ *     $("#wizard").steps().insert(0, {
+ *         title: "Title",
+ *         content: "", // optional
+ *         contentMode: "async", // optional
